@@ -3,20 +3,32 @@ use std::io;
 use std::process;
 
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    let chars = pattern.chars();
+    // let chars = pattern.chars();
     // for ch in chars {
     //     eprint!("{ch}\n");
     // }
     if pattern.chars().count() == 1 {
         return input_line.contains(pattern);
     } else {
-        if pattern == r"\d" {
-            for ch in input_line.chars() {
-                if ch.is_digit(10) {
-                    return true;
-                };
+        match pattern {
+            r"\d" => {
+                for ch in input_line.chars() {
+                    if ch.is_digit(10) {
+                        return true;
+                    };
+                }
+                return false;
             }
-            return false;
+            r"\w" => {
+                for ch in input_line.chars() {
+                    if ch.is_alphanumeric() || ch == '_' {
+                        return true;
+                    };
+                }
+                return false;
+            }
+
+            _ => return false,
         }
         panic!("Unhandled pattern: {}", pattern)
     }
