@@ -8,7 +8,7 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
         return input_line.contains(pattern);
     } else {
         match pattern {
-            r"\d" => return input_line.chars().any(|ch| ch.is_digit(10)),
+            r"\d" => return input_line.chars().any(|ch| ch.is_digit(10)), // any  foreach 用法
             r"\w" => {
                 return input_line
                     .chars()
@@ -16,7 +16,7 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
             }
             _ => {
                 if pattern.starts_with('[') && pattern.ends_with(']') {
-                    let set: HashSet<char> = pattern[1..pattern.len() - 1].chars().collect();
+                    let set: HashSet<char> = pattern[1..pattern.len() - 1].chars().collect(); // str 自身就有contains方法  collect自动创造容器
                     return input_line.chars().any(|ch| set.contains(&ch));
                 }
                 return false;
