@@ -16,8 +16,13 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
             }
             _ => {
                 if pattern.starts_with('[') && pattern.ends_with(']') {
-                    let set: HashSet<char> = pattern[1..pattern.len() - 1].chars().collect(); // str 自身就有contains方法  collect自动创造容器
-                    return input_line.chars().any(|ch| set.contains(&ch));
+                    // str 自身就有contains方法  collect自动创造容器
+                    let group = &pattern[1..pattern.len() - 1];
+                    if pattern.starts_with("[^") {
+                        return input_line.chars().any(|ch| !group.contains(ch));
+                    } else {
+                        return input_line.chars().any(|ch| group.contains(ch));
+                    }
                 }
                 return false;
             }
