@@ -73,7 +73,10 @@ impl Reg {
                 };
                 res && self.run(pc + 1, &text[c.len_utf8()..])
             }),
-            Inst::Digit => todo!(),
+            Inst::Digit => text
+                .chars()
+                .nth(0)
+                .is_some_and(|c| c.is_digit(10) && self.run(pc + 1, &text[c.len_utf8()..])),
             Inst::AlphaNumber => todo!(),
         }
     }
@@ -100,7 +103,7 @@ impl Reg {
                     Some('w') => instrs.push(Inst::AlphaNumber),
                     _ => return Err(RegError::UnknownEscape),
                 },
-                '.' | 'a'..='z' => {
+                '.' | ' ' | 'a'..='z' => {
                     let char_inst = match ch {
                         '.' => Inst::AnyChar,
                         _ => Inst::Char(ch),
@@ -210,6 +213,16 @@ mod tests {
         assert_eq!(res, false);
         assert_eq!(reg.is_match(r"apple"), true);
         assert_eq!(reg.is_match(r"pppleapplepple"), true);
+        Ok(())
+    }
+
+    #[test]
+    fn test_escaped_char() -> Result<(), Error> {
+        let reg = Reg::new(r"\d apple").context("编译模式串出错")?;
+        let list = reg.instrs();
+        eprintln!("{:?}", list);
+        let res = reg.is_match("sally has 3 apples");
+        assert_eq!(res, true);
         Ok(())
     }
 }
