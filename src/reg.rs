@@ -77,7 +77,10 @@ impl Reg {
                 .chars()
                 .nth(0)
                 .is_some_and(|c| c.is_digit(10) && self.run(pc + 1, &text[c.len_utf8()..])),
-            Inst::AlphaNumber => todo!(),
+            Inst::AlphaNumber => text
+                .chars()
+                .nth(0)
+                .is_some_and(|c| c.is_alphanumeric() && self.run(pc + 1, &text[c.len_utf8()..])),
         }
     }
 
@@ -222,6 +225,16 @@ mod tests {
         let list = reg.instrs();
         eprintln!("{:?}", list);
         let res = reg.is_match("sally has 3 apples");
+        assert_eq!(res, true);
+        Ok(())
+    }
+
+    #[test]
+    fn test_escaped_char_alphanumber() -> Result<(), Error> {
+        let reg = Reg::new(r"\d \w\w\ws").context("编译模式串出错")?;
+        let list = reg.instrs();
+        eprintln!("{:?}", list);
+        let res = reg.is_match("sally has 3 dogs");
         assert_eq!(res, true);
         Ok(())
     }
