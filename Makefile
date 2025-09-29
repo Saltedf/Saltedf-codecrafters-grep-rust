@@ -12,8 +12,7 @@ submittest:
 	# @符号会阻止 make 打印出这条命令本身，使输出更干净。
 	# 警告：Makefile中的缩进必须是Tab键，而不是空格！这是它最古怪的地方。
 	@echo ">>> 1. Staging all changes..."
-	@pwd
-	@git add .
+	@cargo check
 	@echo ">>> 2. Committing with message: \"$(MSG)\""
 	@git commit --allow-empty -am "submit & test"
 	@echo ">>> 3. Pushing to origin/$(BRANCH)..."
