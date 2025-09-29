@@ -14,6 +14,9 @@ pub enum ParseError {
 
     #[error("未闭合的字符类，缺少']'")]
     UnclosedCharClass,
+
+    #[error("'$'后面不允许出现其它字符")]
+    MisplacedAnchor,
 }
 
 pub struct Parser<'p> {
@@ -125,6 +128,12 @@ impl<'p> Parser<'p> {
                 }
             }
             Some('^') => self.instrs.push(Inst::Start),
+            Some('$') => {
+                self.instrs.push(Inst::End);
+                if self.chars.peek().is_some() {
+                    return Err(ParseError::MisplacedAnchor);
+                }
+            }
             Some(_) => todo!(),
             None => todo!(),
         }

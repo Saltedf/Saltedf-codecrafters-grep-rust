@@ -89,7 +89,7 @@ impl Regex {
             Inst::Char(ch) => text.starts_with(*ch) && self.run(pc + 1, &text[ch.len_utf8()..]),
             Inst::AnyChar => todo!(),
             Inst::Start => todo!(),
-            Inst::End => text.is_empty() && self.run(pc + 1, text),
+            Inst::End => text.is_empty(),
             Inst::Match => true,
             Inst::Jump(target_pc) => self.run(*target_pc, text),
             Inst::Split(b1, b2) => self.run(*b1, text) || self.run(*b2, text),
@@ -204,6 +204,15 @@ mod tests {
         let list = &reg.instrs;
         eprintln!("{:?}", list);
         assert_eq!(reg.is_match("aaacb"), false);
+        Ok(())
+    }
+
+    #[test]
+    fn test_match_anchor() -> Result<(), Error> {
+        let reg = Regex::new("a*ab$").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!("{:?}", list);
+        assert_eq!(reg.is_match("aaabb"), false);
         Ok(())
     }
 }
