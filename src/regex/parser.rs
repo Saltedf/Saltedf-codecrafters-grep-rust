@@ -124,7 +124,7 @@ impl<'p> Parser<'p> {
                     }
                 }
             }
-            Some(_) => todo!(),
+            Some('^') => self.instrs.push(Inst::Start),
             None => todo!(),
         }
 
