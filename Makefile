@@ -15,7 +15,7 @@ submittest:
 	@pwd
 	@git add .
 	@echo ">>> 2. Committing with message: \"$(MSG)\""
-	@git commit --allow-empty -m "submit & test"
+	@git commit --allow-empty -am "submit & test"
 	@echo ">>> 3. Pushing to origin/$(BRANCH)..."
 	@git push origin $(BRANCH)
 	@echo "✅ Done."
