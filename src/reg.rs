@@ -36,7 +36,6 @@ impl Reg {
         let instrs = Self::compile(pattern)?;
         Ok(Self { instrs })
     }
-
     pub fn is_match(&self, text: &str) -> bool {
         match self.instrs.get(0) {
             Some(Inst::Start) => return self.run(1, text),
@@ -63,8 +62,8 @@ impl Reg {
             Inst::Start => todo!(),
             Inst::End => text.is_empty() && self.run(pc + 1, text),
             Inst::Match => true,
-            Inst::Jump(_) => todo!(),
-            Inst::Split(_, _) => todo!(),
+            Inst::Jump(target_pc) => self.run(*target_pc, text),
+            Inst::Split(b1, b2) => self.run(*b1, text) || self.run(*b2, text),
             Inst::Group { negated, chars } => text.chars().nth(0).is_some_and(|c| {
                 let res = if !negated {
                     chars.contains(&c)
@@ -137,10 +136,32 @@ impl Reg {
                         negated = true;
                         stream.next();
                     }
+
                     loop {
                         match stream.next() {
                             Some(']') => {
-                                instrs.push(Inst::Group { negated, chars });
+                                let group_instr = Inst::Group { negated, chars };
+                                if let Some('+') | Some('*') = stream.peek() {
+                                    let quantifier = stream.next().expect("非空");
+                                    if quantifier == '+' {
+                                        instrs.push(group_instr.clone());
+                                    }
+                                    patch_list.push(instrs.len());
+                                    let start = instrs.len();
+                                    instrs.push(Inst::Split(start + 1, 0));
+                                    instrs.push(group_instr);
+                                    instrs.push(Inst::Jump(start));
+                                    let pc_to_target = instrs.len();
+                                    if let Some(pc_to_patch) = patch_list.pop() {
+                                        if let Some(Inst::Split(_, target)) =
+                                            instrs.get_mut(pc_to_patch)
+                                        {
+                                            *target = pc_to_target;
+                                        }
+                                    }
+                                } else {
+                                    instrs.push(group_instr);
+                                }
                                 break;
                             }
                             Some(c) => {
@@ -169,7 +190,7 @@ mod tests {
     use anyhow::{Context, Error};
 
     #[test]
-    fn test_zero_or_more() -> Result<(), Error> {
+    fn test_compile_zero_or_more() -> Result<(), Error> {
         let reg = Reg::new("a*bbbb").context("编译模式串出错")?;
         let list = reg.instrs();
         eprintln!("{:?}", list);
@@ -219,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn test_escaped_char() -> Result<(), Error> {
+    fn test_match_escaped_char() -> Result<(), Error> {
         let reg = Reg::new(r"\d apple").context("编译模式串出错")?;
         let list = reg.instrs();
         eprintln!("{:?}", list);
@@ -246,6 +267,15 @@ mod tests {
         eprintln!("{}", '_'.is_alphanumeric());
         let res = reg.is_match("×#÷_%÷×");
         assert_eq!(res, true);
+        Ok(())
+    }
+
+    #[test]
+    fn test_match_zero_or_more() -> Result<(), Error> {
+        let reg = Reg::new("a*ab").context("编译模式串出错")?;
+        let list = reg.instrs();
+        eprintln!("{:?}", list);
+        assert_eq!(reg.is_match("aaacb"), false);
         Ok(())
     }
 }

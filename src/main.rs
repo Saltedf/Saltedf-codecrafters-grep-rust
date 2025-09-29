@@ -41,7 +41,7 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
 // Usage: echo <input_text> | your_program.sh -E <pattern>
 fn main() -> Result<(), Error> {
     // You can use print statements as follows for debugging, they'll be visible when running tests.
-    eprintln!("Logs from your program will appear here!");
+    // eprintln!("Logs from your program will appear here!");
 
     if env::args().nth(1).unwrap() != "-E" {
         println!("Expected first argument to be '-E'");
@@ -56,6 +56,7 @@ fn main() -> Result<(), Error> {
     let re = Reg::new(&pattern)?;
     // Uncomment this block to pass the first stage
     if re.is_match(input_line.as_str()) {
+        println!("{input_line}");
         process::exit(0)
     } else {
         process::exit(1)
