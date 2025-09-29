@@ -1,7 +1,7 @@
-mod reg;
+mod regex;
 
 use anyhow::Error;
-use reg::*;
+use regex::*;
 use std::char;
 use std::collections::HashSet;
 use std::env;
@@ -10,7 +10,7 @@ use std::iter::Peekable;
 use std::process;
 use std::str::Chars;
 
-fn match_pattern(input_line: &str, pattern: &str) -> bool {
+/* fn match_pattern(input_line: &str, pattern: &str) -> bool {
     if pattern.chars().count() == 1 {
         return input_line.contains(pattern);
     } else {
@@ -37,6 +37,7 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
     }
     panic!("Unhandled pattern: {}", pattern);
 }
+ */
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
 fn main() -> Result<(), Error> {
@@ -53,7 +54,7 @@ fn main() -> Result<(), Error> {
 
     io::stdin().read_line(&mut input_line).unwrap();
 
-    let re = Reg::new(&pattern)?;
+    let re = Regex::new(&pattern)?;
     // Uncomment this block to pass the first stage
     if re.is_match(input_line.as_str()) {
         println!("{input_line}");
@@ -61,9 +62,4 @@ fn main() -> Result<(), Error> {
     } else {
         process::exit(1)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*; // 导入父模块的所有内容
 }
