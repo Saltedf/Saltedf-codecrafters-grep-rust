@@ -60,7 +60,7 @@ impl<'p> Parser<'p> {
             }
             Some('?') => {
                 self.chars.next();
-                todo!()
+                self.generate_zero_or_one_code(atom)?;
             }
             Some('{') => todo!(),
             Some(_) | None => self.instrs.extend(atom.into_iter()),
@@ -167,8 +167,19 @@ impl<'p> Parser<'p> {
         self.generate_zero_or_more_code(atom)?;
         Ok(())
     }
+
     fn generate_zero_or_one_code(&mut self, atom: Vec<Inst>) -> Result<(), ParseError> {
-        todo!();
+        let start = self.pc();
+        let split_code = Inst::Split(start + 1, 0);
+        self.instrs.push(split_code);
+        self.patch_list.push(start);
+        self.instrs.extend(atom.into_iter());
+        let pc_to_target = self.pc();
+        if let Some(index) = self.patch_list.pop() {
+            if let Some(Inst::Split(_, target)) = self.instrs.get_mut(index) {
+                *target = pc_to_target;
+            }
+        }
         Ok(())
     }
 
