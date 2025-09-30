@@ -87,7 +87,11 @@ impl Regex {
     fn run(&self, pc: usize, text: &str) -> bool {
         match &self.instrs[pc] {
             Inst::Char(ch) => text.starts_with(*ch) && self.run(pc + 1, &text[ch.len_utf8()..]),
-            Inst::AnyChar => true && self.run(pc + 1, &text[1..]),
+            Inst::AnyChar => {
+                let mut cursor = text.chars();
+                cursor.next();
+                (!text.is_empty()) && self.run(pc + 1, cursor.as_str())
+            }
             Inst::Start => todo!(),
             Inst::End => text.is_empty(),
             Inst::Match => true,
@@ -218,10 +222,10 @@ mod tests {
 
     #[test]
     fn test_match_wildcard() -> Result<(), Error> {
-        let reg = Regex::new("c.t").context("编译模式串出错")?;
+        let reg = Regex::new(r"g.+gol").context("编译模式串出错")?;
         let list = &reg.instrs;
-        eprintln!("{:?}", list);
-        assert_eq!(reg.is_match("car"), false);
+         eprintln!(">> {:?}", list);
+         assert_eq!(reg.is_match("goøö0Ogol"), true);
         Ok(())
     }
 }
