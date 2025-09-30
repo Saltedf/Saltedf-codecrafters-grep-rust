@@ -87,7 +87,7 @@ impl Regex {
     fn run(&self, pc: usize, text: &str) -> bool {
         match &self.instrs[pc] {
             Inst::Char(ch) => text.starts_with(*ch) && self.run(pc + 1, &text[ch.len_utf8()..]),
-            Inst::AnyChar => todo!(),
+            Inst::AnyChar => true,
             Inst::Start => todo!(),
             Inst::End => text.is_empty(),
             Inst::Match => true,
