@@ -87,7 +87,7 @@ impl Regex {
     fn run(&self, pc: usize, text: &str) -> bool {
         match &self.instrs[pc] {
             Inst::Char(ch) => text.starts_with(*ch) && self.run(pc + 1, &text[ch.len_utf8()..]),
-            Inst::AnyChar => true,
+            Inst::AnyChar => true && self.run(pc + 1, &text[1..]),
             Inst::Start => todo!(),
             Inst::End => text.is_empty(),
             Inst::Match => true,
@@ -213,6 +213,15 @@ mod tests {
         let list = &reg.instrs;
         eprintln!("{:?}", list);
         assert_eq!(reg.is_match("aaabb"), false);
+        Ok(())
+    }
+
+    #[test]
+    fn test_match_wildcard() -> Result<(), Error> {
+        let reg = Regex::new("c.t").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!("{:?}", list);
+        assert_eq!(reg.is_match("car"), false);
         Ok(())
     }
 }
