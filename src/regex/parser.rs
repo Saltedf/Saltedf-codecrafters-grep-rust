@@ -15,8 +15,14 @@ pub enum ParseError {
     #[error("未闭合的字符类，缺少']'")]
     UnclosedCharClass,
 
+    #[error("未闭合的()，缺少')'")]
+    UnclosedGroup,
+
     #[error("'$'后面不允许出现其它字符")]
     MisplacedAnchor,
+
+    #[error("指令回填错误")]
+    PatchError,
 }
 
 pub struct Parser<'p> {
@@ -47,24 +53,69 @@ impl<'p> Parser<'p> {
         Ok(())
     }
 
-    fn parse_term(&mut self) -> Result<(), ParseError> {
-        let atom = self.parse_atom()?;
-        match self.chars.peek() {
-            Some('*') => {
-                self.chars.next();
-                self.generate_zero_or_more_code(atom)?;
+    fn patch_top_inst(&mut self, pc_to_target: usize) -> Result<(), ParseError> {
+        if let Some(inst_id) = self.patch_list.pop() {
+            match self.instrs.get_mut(inst_id) {
+                Some(Inst::Split(_, target)) => {
+                    *target = pc_to_target;
+                }
+                Some(Inst::Jump(target)) => {
+                    *target = pc_to_target;
+                }
+                Some(_) | None => return Err(ParseError::PatchError)
             }
-            Some('+') => {
-                self.chars.next();
-                self.generate_one_or_more_code(atom)?;
-            }
-            Some('?') => {
-                self.chars.next();
-                self.generate_zero_or_one_code(atom)?;
-            }
-            Some('{') => todo!(),
-            Some(_) | None => self.instrs.extend(atom.into_iter()),
         }
+        Ok(())
+    }
+    fn parse_term(&mut self) -> Result<(), ParseError> {
+        if let Some('(') = self.chars.peek() {
+            self.chars.next();
+            let start = self.pc();
+            let split = Inst::Split(start + 1, 0);
+            self.patch_list.push(start);
+            self.instrs.push(split);
+
+            loop {
+                match self.chars.peek() {
+                    None => return Err(ParseError::UnclosedGroup),
+                    Some('|') => {
+                        self.chars.next();
+                        let jump = Inst::Jump(0);
+                        let jump_index = self.pc();
+                        self.instrs.push(jump);
+                        self.patch_top_inst(self.pc())?;
+                        self.patch_list.push(jump_index);
+                    }
+                    Some(')') => {
+                        self.chars.next();
+                        self.patch_top_inst(self.pc())?;
+                        break;
+                    }
+                    Some(_) => self.parse_term()?,
+                }
+            }
+        } else {
+
+            // parse like: 'a*','a+' or 'a?'
+            let atom = self.parse_atom()?;
+            match self.chars.peek() {
+                Some('*') => {
+                    self.chars.next();
+                    self.generate_zero_or_more_code(atom)?;
+                }
+                Some('+') => {
+                    self.chars.next();
+                    self.generate_one_or_more_code(atom)?;
+                }
+                Some('?') => {
+                    self.chars.next();
+                    self.generate_zero_or_one_code(atom)?;
+                }
+                Some('{') => todo!(),
+                Some(_) | None => self.instrs.extend(atom.into_iter()),
+            }
+        }
+
         Ok(())
     }
 
@@ -92,7 +143,7 @@ impl<'p> Parser<'p> {
                 loop {
                     match self.chars.next() {
                         Some(']') => {
-                            atom_instrs.push(Inst::Group {
+                            atom_instrs.push(Inst::CharClass {
                                 negated,
                                 chars: set,
                             });
@@ -183,11 +234,11 @@ impl<'p> Parser<'p> {
         Ok(())
     }
 
-    fn translate_range(start: char, end: char) -> impl IntoIterator<Item = char> {
+    fn translate_range(start: char, end: char) -> impl IntoIterator<Item=char> {
         let is_range = (start as usize <= end as usize)
             && (start.is_ascii_digit() && end.is_ascii_digit()
-                || start.is_ascii_lowercase() && end.is_ascii_lowercase()
-                || start.is_ascii_uppercase() && end.is_ascii_uppercase());
+            || start.is_ascii_lowercase() && end.is_ascii_lowercase()
+            || start.is_ascii_uppercase() && end.is_ascii_uppercase());
 
         if is_range {
             return (start..=end).collect::<Vec<char>>().into_iter();
@@ -199,8 +250,6 @@ impl<'p> Parser<'p> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_splice() {
         let a = '0';

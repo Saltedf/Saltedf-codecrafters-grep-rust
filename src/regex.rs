@@ -27,7 +27,7 @@ enum Inst {
     Match,
     Jump(usize),
     Split(usize, usize),
-    Group { negated: bool, chars: HashSet<char> },
+    CharClass { negated: bool, chars: HashSet<char> },
     Digit,
     MetaChar, // \w : alpha digit '_'
 }
@@ -42,7 +42,7 @@ impl Inst {
             Inst::Match => true,
             Inst::Jump(_) => false,
             Inst::Split(_, _) => false,
-            Inst::Group { negated, chars } => {
+            Inst::CharClass { negated, chars } => {
                 if *negated {
                     !chars.contains(ch)
                 } else {
@@ -97,7 +97,7 @@ impl Regex {
             Inst::Match => true,
             Inst::Jump(target_pc) => self.run(*target_pc, text),
             Inst::Split(b1, b2) => self.run(*b1, text) || self.run(*b2, text),
-            Inst::Group { negated, chars } => text.chars().nth(0).is_some_and(|c| {
+            Inst::CharClass { negated, chars } => text.chars().nth(0).is_some_and(|c| {
                 let res = if !negated {
                     chars.contains(&c)
                 } else {
@@ -224,8 +224,16 @@ mod tests {
     fn test_match_wildcard() -> Result<(), Error> {
         let reg = Regex::new(r"g.+gol").context("编译模式串出错")?;
         let list = &reg.instrs;
-         eprintln!(">> {:?}", list);
-         assert_eq!(reg.is_match("goøö0Ogol"), true);
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("goøö0Ogol"), true);
+        Ok(())
+    }
+    #[test]
+    fn test_match_alternation() -> Result<(), Error> {
+        let reg = Regex::new(r"((aaa|bbb)|ddd)").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("bbb"), true);
         Ok(())
     }
 }
