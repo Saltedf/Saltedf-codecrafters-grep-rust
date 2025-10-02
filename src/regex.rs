@@ -236,4 +236,13 @@ mod tests {
         assert_eq!(reg.is_match("bbb"), true);
         Ok(())
     }
+
+    #[test]
+    fn test_match_alternation2() -> Result<(), Error> {
+        let reg = Regex::new(r"^I see \d+ (cat|dog)s?$").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("I see 42 dogs"), true);
+        Ok(())
+    }
 }
