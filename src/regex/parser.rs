@@ -1,8 +1,6 @@
-use std::{collections::HashSet, iter::Peekable, str::Chars};
-
-use thiserror::{self, Error};
-
 use crate::regex::Inst;
+use std::{collections::HashSet, iter::Peekable, str::Chars};
+use thiserror::{self, Error};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -62,7 +60,7 @@ impl<'p> Parser<'p> {
                 Some(Inst::Jump(target)) => {
                     *target = pc_to_target;
                 }
-                Some(_) | None => return Err(ParseError::PatchError)
+                Some(_) | None => return Err(ParseError::PatchError),
             }
         }
         Ok(())
@@ -74,7 +72,6 @@ impl<'p> Parser<'p> {
             let split = Inst::Split(start + 1, 0);
             self.patch_list.push(start);
             self.instrs.push(split);
-
             loop {
                 match self.chars.peek() {
                     None => return Err(ParseError::UnclosedGroup),
@@ -95,7 +92,6 @@ impl<'p> Parser<'p> {
                 }
             }
         } else {
-
             // parse like: 'a*','a+' or 'a?'
             let atom = self.parse_atom()?;
             match self.chars.peek() {
@@ -208,6 +204,7 @@ impl<'p> Parser<'p> {
             if let Some(Inst::Split(_, target)) = self.instrs.get_mut(patch) {
                 *target = pc_to_target;
             }
+            p
         }
 
         Ok(())
@@ -234,11 +231,11 @@ impl<'p> Parser<'p> {
         Ok(())
     }
 
-    fn translate_range(start: char, end: char) -> impl IntoIterator<Item=char> {
+    fn translate_range(start: char, end: char) -> impl IntoIterator<Item = char> {
         let is_range = (start as usize <= end as usize)
             && (start.is_ascii_digit() && end.is_ascii_digit()
-            || start.is_ascii_lowercase() && end.is_ascii_lowercase()
-            || start.is_ascii_uppercase() && end.is_ascii_uppercase());
+                || start.is_ascii_lowercase() && end.is_ascii_lowercase()
+                || start.is_ascii_uppercase() && end.is_ascii_uppercase());
 
         if is_range {
             return (start..=end).collect::<Vec<char>>().into_iter();

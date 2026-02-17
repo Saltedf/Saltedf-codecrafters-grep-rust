@@ -1,10 +1,8 @@
 mod parser;
-
+use crate::regex::parser::Parser;
 use anyhow::Error;
 use std::{char, collections::HashSet};
 use thiserror::{self, Error};
-
-use crate::regex::parser::Parser;
 
 #[derive(Debug, Error)]
 pub enum RegexError {
@@ -228,6 +226,7 @@ mod tests {
         assert_eq!(reg.is_match("goøö0Ogol"), true);
         Ok(())
     }
+
     #[test]
     fn test_match_alternation() -> Result<(), Error> {
         let reg = Regex::new(r"((aaa|bbb)|ddd)").context("编译模式串出错")?;
