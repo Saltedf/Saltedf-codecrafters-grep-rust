@@ -204,7 +204,6 @@ impl<'p> Parser<'p> {
             if let Some(Inst::Split(_, target)) = self.instrs.get_mut(patch) {
                 *target = pc_to_target;
             }
-            p
         }
 
         Ok(())
