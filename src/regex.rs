@@ -1,7 +1,14 @@
+mod input;
 mod parser;
+mod result;
+mod vm;
+
 use crate::regex::parser::Parser;
 use anyhow::Error;
-use std::{char, collections::HashSet};
+use std::{
+    char,
+    collections::{HashMap, HashSet},
+};
 use thiserror::{self, Error};
 
 #[derive(Debug, Error)]
@@ -17,7 +24,7 @@ pub enum RegexError {
 }
 
 #[derive(Debug, Clone)]
-enum Inst {
+pub enum Inst {
     Char(char), // one char
     AnyChar,
     Start,
@@ -28,6 +35,10 @@ enum Inst {
     CharClass { negated: bool, chars: HashSet<char> },
     Digit,
     MetaChar, // \w : alpha digit '_'
+
+    GroupBegin(usize), // (
+    GroupEnd(usize),   // )
+    Ref(usize),        // '\1'
 }
 
 impl Inst {
@@ -49,6 +60,7 @@ impl Inst {
             }
             Inst::Digit => ch.is_digit(10),
             Inst::MetaChar => ch.is_alphanumeric() || *ch == '_',
+            _ => todo!("尚未实现指令的匹配逻辑"),
         }
     }
 }
@@ -110,6 +122,11 @@ impl Regex {
             Inst::MetaChar => text.chars().nth(0).is_some_and(|c| {
                 (c.is_alphanumeric() || c == '_') && self.run(pc + 1, &text[c.len_utf8()..])
             }),
+            Inst::GroupBegin(num) => {
+                todo!()
+            }
+            Inst::GroupEnd(num) => todo!(),
+            _ => todo!("没有实现的指令"),
         }
     }
 }
@@ -118,6 +135,12 @@ impl Regex {
 mod tests {
     use super::*;
     use anyhow::{Context, Error};
+
+    #[test]
+    fn test_vec_len() -> () {
+        let mut vec: Vec<i64> = Vec::new();
+        eprintln!(">> {}", vec.len())
+    }
 
     #[test]
     fn test_compile_zero_or_more() -> Result<(), Error> {
