@@ -4,7 +4,7 @@ mod parser;
 mod result;
 mod vm;
 
-use crate::regex::{input::Text, ir::*, parser::Parser, vm::VM};
+use crate::regex::{input::Text, ir::Inst, parser::Parser, vm::VM};
 
 use anyhow::Error;
 use std::{
