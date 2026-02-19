@@ -160,7 +160,7 @@ impl<'p> Parser<'p> {
 
         match self.chars.next() {
             Some('.') => atom_instrs.push(Inst::AnyChar),
-            Some(ch @ ('a'..='z' | 'A'..='Z' | '0'..='9' | ' ' | '-' | '_' | '\'')) => {
+            Some(ch @ ('a'..='z' | 'A'..='Z' | '0'..='9' | ',' | ' ' | '-' | '_' | '\'')) => {
                 atom_instrs.push(Inst::Char(ch));
             }
             Some('\\') => match self.chars.next() {
@@ -225,7 +225,10 @@ impl<'p> Parser<'p> {
                     return Err(ParseError::MisplacedAnchor);
                 }
             }
-            Some(_) => todo!(),
+            Some(c) => {
+                eprintln!("未支持的字符: {}", c);
+                todo!()
+            }
             None => todo!(),
         }
 

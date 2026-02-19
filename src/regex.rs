@@ -200,6 +200,15 @@ mod tests {
     }
 
     #[test]
+    fn test_capturing_groups2() -> Result<(), Error> {
+        let reg = Regex::new(r"^([act]+) is \1, not [^xyz]+$").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("cat is cat, not dog"), false);
+        Ok(())
+    }
+
+    #[test]
     fn test_nested_capturing_groups() -> Result<(), Error> {
         let reg = Regex::new(r"('(cat) and \2') is the same as \1").context("编译模式串出错")?;
         let list = &reg.instrs;
