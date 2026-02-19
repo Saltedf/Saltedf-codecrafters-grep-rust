@@ -1,9 +1,11 @@
 mod input;
+mod ir;
 mod parser;
 mod result;
 mod vm;
 
-use crate::regex::parser::Parser;
+use crate::regex::{input::Text, ir::*, parser::Parser, vm::VM};
+
 use anyhow::Error;
 use std::{
     char,
@@ -23,48 +25,6 @@ pub enum RegexError {
     UnclosedCharClass,
 }
 
-#[derive(Debug, Clone)]
-pub enum Inst {
-    Char(char), // one char
-    AnyChar,
-    Start,
-    End,
-    Match,
-    Jump(usize),
-    Split(usize, usize),
-    CharClass { negated: bool, chars: HashSet<char> },
-    Digit,
-    MetaChar, // \w : alpha digit '_'
-
-    GroupBegin(usize), // (
-    GroupEnd(usize),   // )
-    Ref(usize),        // '\1'
-}
-
-impl Inst {
-    pub fn is_match(&self, ch: &char) -> bool {
-        match self {
-            Inst::Char(c) => *c == *ch,
-            Inst::AnyChar => true,
-            Inst::Start => false,
-            Inst::End => false,
-            Inst::Match => true,
-            Inst::Jump(_) => false,
-            Inst::Split(_, _) => false,
-            Inst::CharClass { negated, chars } => {
-                if *negated {
-                    !chars.contains(ch)
-                } else {
-                    chars.contains(ch)
-                }
-            }
-            Inst::Digit => ch.is_digit(10),
-            Inst::MetaChar => ch.is_alphanumeric() || *ch == '_',
-            _ => todo!("尚未实现指令的匹配逻辑"),
-        }
-    }
-}
-
 pub struct Regex {
     instrs: Vec<Inst>,
 }
@@ -76,57 +36,26 @@ impl Regex {
     }
 
     pub fn is_match(&self, text: &str) -> bool {
+        let input = Text::new(text);
+        // let mut vm = VM::new(&self.instrs);
+
         match self.instrs.get(0) {
-            Some(Inst::Start) => self.run(1, text),
+            Some(Inst::Start) => {
+                let mut vm = VM::new(&self.instrs);
+                vm.run(1, &input, 0)
+            }
             Some(_) => {
-                let mut text_cursor = text;
-                while !text_cursor.is_empty() {
-                    if self.run(0, text_cursor) {
+                let mut text_cursor = 0;
+                while !input.is_end(text_cursor) {
+                    let mut vm = VM::new(&self.instrs);
+                    if vm.run(0, &input, text_cursor) {
                         return true;
                     }
-                    let mut chars = text_cursor.chars();
-                    chars.next();
-                    text_cursor = chars.as_str();
+                    text_cursor = input.next_cursor_unsafe(text_cursor);
                 }
                 false
             }
             None => true,
-        }
-    }
-
-    fn run(&self, pc: usize, text: &str) -> bool {
-        match &self.instrs[pc] {
-            Inst::Char(ch) => text.starts_with(*ch) && self.run(pc + 1, &text[ch.len_utf8()..]),
-            Inst::AnyChar => {
-                let mut cursor = text.chars();
-                cursor.next();
-                (!text.is_empty()) && self.run(pc + 1, cursor.as_str())
-            }
-            Inst::Start => todo!(),
-            Inst::End => text.is_empty(),
-            Inst::Match => true,
-            Inst::Jump(target_pc) => self.run(*target_pc, text),
-            Inst::Split(b1, b2) => self.run(*b1, text) || self.run(*b2, text),
-            Inst::CharClass { negated, chars } => text.chars().nth(0).is_some_and(|c| {
-                let res = if !negated {
-                    chars.contains(&c)
-                } else {
-                    !chars.contains(&c)
-                };
-                res && self.run(pc + 1, &text[c.len_utf8()..])
-            }),
-            Inst::Digit => text
-                .chars()
-                .nth(0)
-                .is_some_and(|c| c.is_digit(10) && self.run(pc + 1, &text[c.len_utf8()..])),
-            Inst::MetaChar => text.chars().nth(0).is_some_and(|c| {
-                (c.is_alphanumeric() || c == '_') && self.run(pc + 1, &text[c.len_utf8()..])
-            }),
-            Inst::GroupBegin(num) => {
-                todo!()
-            }
-            Inst::GroupEnd(num) => todo!(),
-            _ => todo!("没有实现的指令"),
         }
     }
 }
@@ -135,12 +64,6 @@ impl Regex {
 mod tests {
     use super::*;
     use anyhow::{Context, Error};
-
-    #[test]
-    fn test_vec_len() -> () {
-        let mut vec: Vec<i64> = Vec::new();
-        eprintln!(">> {}", vec.len())
-    }
 
     #[test]
     fn test_compile_zero_or_more() -> Result<(), Error> {
@@ -265,6 +188,35 @@ mod tests {
         let list = &reg.instrs;
         eprintln!(">> {:?}", list);
         assert_eq!(reg.is_match("I see 42 dogs"), true);
+        Ok(())
+    }
+    #[test]
+    fn test_match_alternation3() -> Result<(), Error> {
+        let reg = Regex::new(r"^I see \d+ (cat)s?$").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("I see 42 cats"), true);
+        Ok(())
+    }
+
+    #[test]
+    fn test_nested_capturing_groups() -> Result<(), Error> {
+        let reg = Regex::new(r"('(cat) and \2') is the same as \1").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(
+            reg.is_match("'cat and cat' is the same as 'cat and cat'"),
+            true
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_multiple_backreferences() -> Result<(), Error> {
+        let reg = Regex::new(r"(\d+) (\w+) squares and \1 \2 circles").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("3 red squares and 3 red circles"), true);
         Ok(())
     }
 }

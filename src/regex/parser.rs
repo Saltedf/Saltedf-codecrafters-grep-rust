@@ -21,12 +21,17 @@ pub enum ParseError {
 
     #[error("指令回填错误")]
     PatchError,
+
+    #[error("捕获组序号不匹配")]
+    GroupNumMissError,
 }
 
 pub struct Parser<'p> {
     chars: Peekable<Chars<'p>>,
     instrs: Vec<Inst>,
     patch_list: Vec<usize>,
+    num_stack: Vec<usize>,
+    next_group_num: usize,
 }
 
 impl<'p> Parser<'p> {
@@ -35,6 +40,22 @@ impl<'p> Parser<'p> {
             chars: pattern.chars().peekable(),
             instrs: Vec::new(),
             patch_list: Vec::new(),
+            num_stack: Vec::new(),
+            next_group_num: 1,
+        }
+    }
+
+    pub fn next_group_num(&mut self) -> usize {
+        let group_num = self.next_group_num;
+        self.next_group_num += 1;
+        self.num_stack.push(group_num);
+        group_num
+    }
+    pub fn current_group_num(&mut self) -> Result<usize, ParseError> {
+        if let Some(num) = self.num_stack.pop() {
+            Ok(num)
+        } else {
+            return Err(ParseError::GroupNumMissError);
         }
     }
 
@@ -67,7 +88,10 @@ impl<'p> Parser<'p> {
     }
     fn parse_term(&mut self) -> Result<(), ParseError> {
         if let Some('(') = self.chars.peek() {
-            self.chars.next();
+            self.chars.next(); // 实际消耗 '('
+                               // 先插入分组开始的指令
+            let num = self.next_group_num();
+            self.instrs.push(Inst::GroupBegin(num));
             let start = self.pc();
             let split = Inst::Split(start + 1, 0);
             self.patch_list.push(start);
@@ -86,6 +110,9 @@ impl<'p> Parser<'p> {
                     Some(')') => {
                         self.chars.next();
                         self.patch_top_inst(self.pc())?;
+                        // 插入分组结束的指令
+                        let num = self.current_group_num()?;
+                        self.instrs.push(Inst::GroupEnd(num));
                         break;
                     }
                     Some(_) => self.parse_term()?,
@@ -120,12 +147,16 @@ impl<'p> Parser<'p> {
 
         match self.chars.next() {
             Some('.') => atom_instrs.push(Inst::AnyChar),
-            Some(ch @ ('a'..='z' | 'A'..='Z' | '0'..='9' | ' ' | '-' | '_')) => {
+            Some(ch @ ('a'..='z' | 'A'..='Z' | '0'..='9' | ' ' | '-' | '_' | '\'')) => {
                 atom_instrs.push(Inst::Char(ch));
             }
             Some('\\') => match self.chars.next() {
                 Some('d') => atom_instrs.push(Inst::Digit),
                 Some('w') => atom_instrs.push(Inst::MetaChar),
+                Some(d @ '1'..='9') => {
+                    // 向前引用 \1 \2
+                    atom_instrs.push(Inst::Ref(d.to_digit(10).unwrap() as usize))
+                }
                 Some(e) => return Err(ParseError::UnknownEscape(e)),
                 None => return Err(ParseError::IncompletedEscape),
             },
