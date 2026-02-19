@@ -79,8 +79,6 @@ impl<'r> VM<'r> {
                 if let Some((start, end)) = self.capatured.get(num - 1) {
                     let rest = &text.text()[cursor..];
                     let capatured_group = &text.text()[*start..*end];
-                    // eprintln!("rest: {}", rest);
-                    // eprintln!("cap_group: {}", capatured_group);
                     if rest.starts_with(capatured_group) {
                         self.run(pc + 1, text, cursor + capatured_group.chars().count())
                     } else {

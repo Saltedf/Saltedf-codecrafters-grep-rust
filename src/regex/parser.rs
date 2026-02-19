@@ -92,15 +92,18 @@ impl<'p> Parser<'p> {
                                // 先插入分组开始的指令
             let num = self.next_group_num();
             self.instrs.push(Inst::GroupBegin(num));
-            let start = self.pc();
-            let split = Inst::Split(start + 1, 0);
-            self.patch_list.push(start);
+
+            let mut real_split: bool = false;
+            let split_index = self.pc();
+            let split = Inst::Split(split_index + 1, 0);
+            self.patch_list.push(split_index);
             self.instrs.push(split);
             loop {
                 match self.chars.peek() {
                     None => return Err(ParseError::UnclosedGroup),
                     Some('|') => {
                         self.chars.next();
+                        real_split = true;
                         let jump = Inst::Jump(0);
                         let jump_index = self.pc();
                         self.instrs.push(jump);
@@ -109,10 +112,20 @@ impl<'p> Parser<'p> {
                     }
                     Some(')') => {
                         self.chars.next();
-                        self.patch_top_inst(self.pc())?;
+                        if real_split {
+                            self.patch_top_inst(self.pc())?;
+                        } else {
+                            // 组内无分支指令时, 不该继续回填split的第二地址,
+                            // 而要消除开头插入的spilt, 改为jump
+                            if let Some(split) = self.instrs.get_mut(split_index) {
+                                *split = Inst::Jump(split_index + 1)
+                            }
+                        }
+
                         // 插入分组结束的指令
                         let num = self.current_group_num()?;
                         self.instrs.push(Inst::GroupEnd(num));
+
                         break;
                     }
                     Some(_) => self.parse_term()?,

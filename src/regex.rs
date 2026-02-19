@@ -191,11 +191,11 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn test_match_alternation3() -> Result<(), Error> {
-        let reg = Regex::new(r"^I see \d+ (cat)s?$").context("编译模式串出错")?;
+    fn test_capturing_groups() -> Result<(), Error> {
+        let reg = Regex::new(r"(cat) and \1").context("编译模式串出错")?;
         let list = &reg.instrs;
         eprintln!(">> {:?}", list);
-        assert_eq!(reg.is_match("I see 42 cats"), true);
+        assert_eq!(reg.is_match("cat and dog"), false);
         Ok(())
     }
 
