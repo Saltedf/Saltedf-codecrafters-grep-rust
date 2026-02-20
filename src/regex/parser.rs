@@ -83,21 +83,6 @@ impl<'p> Parser<'p> {
         Ok(instrs)
     }
 
-    // fn patch_top_inst(&mut self, pc_to_target: usize) -> Result<(), ParseError> {
-    //     if let Some(inst_id) = self.patch_list.pop() {
-    //         match self.instrs.get_mut(inst_id) {
-    //             Some(Inst::Split(_, target)) => {
-    //                 *target = pc_to_target;
-    //             }
-    //             Some(Inst::Jump(target)) => {
-    //                 *target = pc_to_target;
-    //             }
-    //             Some(_) | None => return Err(ParseError::PatchError),
-    //         }
-    //     }
-    //     Ok(())
-    // }
-
     fn parse_term(&mut self) -> Result<Vec<Inst>, ParseError> {
         let block = if let Some('(') = self.chars.peek() {
             self.chars.next(); // 实际消耗 '('
@@ -216,6 +201,7 @@ impl<'p> Parser<'p> {
                 | ','
                 | '<'
                 | '>'
+                | ':'
                 | ' '
                 | '-'
                 | '_'
