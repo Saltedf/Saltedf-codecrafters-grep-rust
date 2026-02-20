@@ -228,4 +228,15 @@ mod tests {
         assert_eq!(reg.is_match("3 red squares and 3 red circles"), true);
         Ok(())
     }
+
+    
+    #[test]
+    fn test_the_n_quantifier() -> Result<(), Error> {
+        let reg = Regex::new(r"applee{2}").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("appleee"), true);
+        Ok(())
+    }
+
 }

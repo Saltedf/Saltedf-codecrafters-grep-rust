@@ -30,6 +30,9 @@ pub enum ParseError {
 
     #[error("捕获组序号不匹配")]
     GroupNumMissError,
+
+    #[error("非法的量词数字")]
+    InvalidQuantifier(String),
 }
 
 pub struct Parser<'p> {
@@ -161,7 +164,40 @@ impl<'p> Parser<'p> {
                 self.chars.next();
                 Self::emit_zero_or_one_code(block)
             }
-            Some('{') => todo!(),
+            Some('{') => {
+                self.chars.next();
+
+                let mut digit_buffer = vec![];
+                let mut digit = 1;
+                loop {
+                    match self.chars.peek() {
+                        Some(d @ '0'..='9') => {
+                            digit_buffer.push(*d);
+                            self.chars.next();
+                        }
+                        Some('}') => {
+                            self.chars.next();
+                            let digit_text: String = digit_buffer.iter().collect();
+                            digit = digit_text.parse::<usize>().map_err(|err| {
+                                ParseError::InvalidQuantifier(format!(
+                                    "解析数字失败 '{}': {}",
+                                    digit_text, err
+                                ))
+                            })?;
+                            break;
+                        }
+                        Some(_) | None => {
+                            return Err(ParseError::InvalidQuantifier(format!("解析量词失败")))
+                        }
+                    }
+                }
+
+                let mut repeat_block = vec![];
+                for _i in 1..=digit {
+                    repeat_block.extend_from_slice(&block);
+                }
+                repeat_block
+            }
             Some(_) | None => block,
         };
 
