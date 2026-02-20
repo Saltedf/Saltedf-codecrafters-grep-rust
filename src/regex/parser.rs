@@ -160,12 +160,25 @@ impl<'p> Parser<'p> {
 
         match self.chars.next() {
             Some('.') => atom_instrs.push(Inst::AnyChar),
-            Some(ch @ ('a'..='z' | 'A'..='Z' | '0'..='9' | ',' | ' ' | '-' | '_' | '"' | '\'')) => {
+            Some(
+                ch @ ('a'..='z'
+                | 'A'..='Z'
+                | '0'..='9'
+                | ','
+                | '<'
+                | '>'
+                | ' '
+                | '-'
+                | '_'
+                | '"'
+                | '\''),
+            ) => {
                 atom_instrs.push(Inst::Char(ch));
             }
             Some('\\') => match self.chars.next() {
                 Some('d') => atom_instrs.push(Inst::Digit),
                 Some('w') => atom_instrs.push(Inst::MetaChar),
+                Some('\\') => atom_instrs.push(Inst::Char('\\')),
                 Some(d @ '1'..='9') => {
                     // 向前引用 \1 \2
                     atom_instrs.push(Inst::Ref(d.to_digit(10).unwrap() as usize))

@@ -204,7 +204,7 @@ mod tests {
         let reg = Regex::new(r"^([act]+) is \1, not [^xyz]+$").context("编译模式串出错")?;
         let list = &reg.instrs;
         eprintln!(">> {:?}", list);
-        assert_eq!(reg.is_match("cat is cat, not dog"), false);
+        assert_eq!(reg.is_match("cat is cat, not dog"), true);
         Ok(())
     }
 
