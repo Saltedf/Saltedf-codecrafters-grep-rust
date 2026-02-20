@@ -246,4 +246,13 @@ mod tests {
         assert_eq!(reg.is_match("appleee"), true);
         Ok(())
     }
+
+    #[test]
+    fn test_at_least_n_quantifier2() -> Result<(), Error> {
+        let reg = Regex::new(r"(t|p|b){3,}").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("btpb"), true);
+        Ok(())
+    }
 }

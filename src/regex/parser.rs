@@ -93,27 +93,36 @@ impl<'p> Parser<'p> {
             let mut group_instrs = vec![];
             group_instrs.push(Inst::GroupBegin(num));
 
-            let mut real_split: bool = false;
-            let mut branch1 = vec![];
-            let mut branch2 = vec![];
+            // let mut real_split: bool = false;
+            let mut branches: Vec<Vec<Inst>> = vec![];
 
             loop {
                 match self.chars.peek() {
                     None => return Err(ParseError::UnclosedGroup),
                     Some('|') => {
                         self.chars.next();
-                        real_split = true;
+                        
+                        let mut new_branch = vec![];
+                        loop {
+                            match self.chars.peek() {
+                                Some('|') | Some(')') | None => break,
+                                Some(_) => new_branch.extend(self.parse_term()?),
+                            }
+                        }
+                        branches.push(new_branch);
                     }
                     Some(')') => {
                         self.chars.next();
-
-                        if real_split {
-                            let jump = Self::emit_jump_forward(&branch2);
-                            branch1.push(jump);
-                            let split_code = Self::emit_split_code(branch1, branch2);
-                            group_instrs.extend(split_code);
+                        if branches.len() <= 1 {
+                            group_instrs.extend(branches.pop().unwrap_or(vec![]));
                         } else {
-                            group_instrs.extend(branch1);
+                            let mut split_code = branches.pop().unwrap();
+                            while let Some(mut new_branch) = branches.pop() {
+                                let jump = Self::emit_jump_forward(&split_code);
+                                new_branch.push(jump);
+                                split_code = Self::emit_split_code(new_branch, split_code);
+                            }
+                            group_instrs.extend(split_code);
                         }
                         // 插入分组结束的指令
                         let num = self.current_group_num()?;
@@ -121,12 +130,14 @@ impl<'p> Parser<'p> {
                         break;
                     }
                     Some(_) => {
-                        let res = self.parse_term()?;
-                        if real_split {
-                            branch2.extend(res);
-                        } else {
-                            branch1.extend(res);
+                        let mut new_branch = vec![];
+                        loop {
+                            match self.chars.peek() {
+                                Some('|') | Some(')') | None => break,
+                                Some(_) => new_branch.extend(self.parse_term()?),
+                            }
                         }
+                        branches.push(new_branch);
                     }
                 }
             }
