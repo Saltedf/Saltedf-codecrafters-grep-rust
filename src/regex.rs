@@ -229,7 +229,6 @@ mod tests {
         Ok(())
     }
 
-    
     #[test]
     fn test_the_n_quantifier() -> Result<(), Error> {
         let reg = Regex::new(r"applee{2}").context("编译模式串出错")?;
@@ -239,4 +238,12 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_at_least_n_quantifier() -> Result<(), Error> {
+        let reg = Regex::new(r"apple{2,4}$").context("编译模式串出错")?;
+        let list = &reg.instrs;
+        eprintln!(">> {:?}", list);
+        assert_eq!(reg.is_match("appleee"), true);
+        Ok(())
+    }
 }

@@ -158,7 +158,7 @@ impl<'p> Parser<'p> {
                 let mut max = 1;
                 loop {
                     match self.chars.peek() {
-                        Some(d @ '0'..='9') => {
+                        Some(d @ ('0'..='9' | ',')) => {
                             digit_buffer.push(*d);
                             self.chars.next();
                         }
@@ -166,7 +166,10 @@ impl<'p> Parser<'p> {
                             self.chars.next();
                             let digit_text: String = digit_buffer.iter().collect();
                             let mut digits: Vec<&str> = digit_text.split(",").collect();
-                            if let Some(d1) = digits.pop() {
+
+                            eprintln!(">>> {:?}", digits);
+                            if let Some(&d1) = digits.get(0) {
+                                eprintln!("-------> {d1}");
                                 min = d1.parse::<usize>().map_err(|err| {
                                     ParseError::InvalidQuantifier(format!(
                                         "解析数字失败 '{}': {}",
@@ -179,11 +182,12 @@ impl<'p> Parser<'p> {
                                 )));
                             }
 
-                            match digits.pop() {
+                            match digits.get(1) {
                                 None => max = min,
-                                Some(d2) => {
+                                Some(&d2) => {
                                     if d2.is_empty() {
                                         max = usize::MAX;
+                                        eprintln!("-------> {max}");
                                     } else {
                                         max = d2.parse::<usize>().map_err(|err| {
                                             ParseError::InvalidQuantifier(format!(
@@ -218,7 +222,7 @@ impl<'p> Parser<'p> {
                 } else if max != min {
                     // repeat min - max times
                     let at_most_once = Self::emit_zero_or_one_code(block);
-                    for _ in 1..=max {
+                    for _ in 1..=(max - min) {
                         repeat_block.extend_from_slice(&at_most_once);
                     }
                 }
@@ -419,6 +423,8 @@ mod tests {
 
     #[test]
     fn test_split() {
+        eprintln!("empty? {}", "".is_empty());
+
         let text = "2,";
         let res: Vec<&str> = text.split(",").collect();
         eprintln!("{:?}", res);
