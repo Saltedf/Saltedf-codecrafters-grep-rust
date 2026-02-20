@@ -28,6 +28,9 @@ impl<'r> VM<'r> {
             *end = 0
         }
     }
+    pub fn jump_by(pc: usize, offset: isize) -> usize {
+        ((pc as isize) + offset) as usize
+    }
 
     pub fn run(&mut self, pc: usize, text: &Text, cursor: usize) -> bool {
         match &self.instrs[pc] {
@@ -44,8 +47,11 @@ impl<'r> VM<'r> {
             Inst::Start => cursor == 0,
             Inst::End => text.char_at(cursor).is_none(),
             Inst::Match => true,
-            Inst::Jump(target_pc) => self.run(*target_pc, text, cursor),
-            Inst::Split(b1, b2) => self.run(*b1, text, cursor) || self.run(*b2, text, cursor),
+            Inst::Jump(offset) => self.run(Self::jump_by(pc, *offset), text, cursor),
+            Inst::Split(offset1, offset2) => {
+                self.run(Self::jump_by(pc, *offset1), text, cursor)
+                    || self.run(Self::jump_by(pc, *offset2), text, cursor)
+            }
             Inst::CharClass { negated, chars } => text.char_at(cursor).is_some_and(|c| {
                 let res = if !negated {
                     chars.contains(&c)

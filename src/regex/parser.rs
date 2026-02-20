@@ -1,5 +1,11 @@
 use crate::regex::Inst;
-use std::{collections::HashSet, iter::Peekable, str::Chars};
+use std::{
+    collections::HashSet,
+    iter::Peekable,
+    ops::{Add, Sub},
+    str::Chars,
+};
+
 use thiserror::{self, Error};
 
 #[derive(Debug, Error)]
@@ -60,99 +66,106 @@ impl<'p> Parser<'p> {
     }
 
     pub fn compile(mut self) -> Result<Vec<Inst>, ParseError> {
-        self.parse_expr()?;
+        let instrs = self.parse_expr()?;
+        self.instrs.extend(instrs);
         self.instrs.push(Inst::Match);
         Ok(self.instrs)
     }
 
-    fn parse_expr(&mut self) -> Result<(), ParseError> {
+    fn parse_expr(&mut self) -> Result<Vec<Inst>, ParseError> {
+        let mut instrs = vec![];
         while let Some(_) = self.chars.peek() {
-            self.parse_term()?;
+            instrs.extend(self.parse_term()?);
         }
-        Ok(())
+        Ok(instrs)
     }
 
-    fn patch_top_inst(&mut self, pc_to_target: usize) -> Result<(), ParseError> {
-        if let Some(inst_id) = self.patch_list.pop() {
-            match self.instrs.get_mut(inst_id) {
-                Some(Inst::Split(_, target)) => {
-                    *target = pc_to_target;
-                }
-                Some(Inst::Jump(target)) => {
-                    *target = pc_to_target;
-                }
-                Some(_) | None => return Err(ParseError::PatchError),
-            }
-        }
-        Ok(())
-    }
-    fn parse_term(&mut self) -> Result<(), ParseError> {
-        if let Some('(') = self.chars.peek() {
+    // fn patch_top_inst(&mut self, pc_to_target: usize) -> Result<(), ParseError> {
+    //     if let Some(inst_id) = self.patch_list.pop() {
+    //         match self.instrs.get_mut(inst_id) {
+    //             Some(Inst::Split(_, target)) => {
+    //                 *target = pc_to_target;
+    //             }
+    //             Some(Inst::Jump(target)) => {
+    //                 *target = pc_to_target;
+    //             }
+    //             Some(_) | None => return Err(ParseError::PatchError),
+    //         }
+    //     }
+    //     Ok(())
+    // }
+
+    fn parse_term(&mut self) -> Result<Vec<Inst>, ParseError> {
+        let block = if let Some('(') = self.chars.peek() {
             self.chars.next(); // 实际消耗 '('
-                               // 先插入分组开始的指令
+
+            // 先插入分组开始的指令
             let num = self.next_group_num();
-            self.instrs.push(Inst::GroupBegin(num));
+            let mut group_instrs = vec![];
+            group_instrs.push(Inst::GroupBegin(num));
 
             let mut real_split: bool = false;
-            let split_index = self.pc();
-            let split = Inst::Split(split_index + 1, 0);
-            self.patch_list.push(split_index);
-            self.instrs.push(split);
+            let mut branch1 = vec![];
+            let mut branch2 = vec![];
+
             loop {
                 match self.chars.peek() {
                     None => return Err(ParseError::UnclosedGroup),
                     Some('|') => {
                         self.chars.next();
                         real_split = true;
-                        let jump = Inst::Jump(0);
-                        let jump_index = self.pc();
-                        self.instrs.push(jump);
-                        self.patch_top_inst(self.pc())?;
-                        self.patch_list.push(jump_index);
                     }
                     Some(')') => {
                         self.chars.next();
-                        if real_split {
-                            self.patch_top_inst(self.pc())?;
-                        } else {
-                            // 组内无分支指令时, 不该继续回填split的第二地址,
-                            // 而要消除开头插入的spilt, 改为jump
-                            if let Some(split) = self.instrs.get_mut(split_index) {
-                                *split = Inst::Jump(split_index + 1)
-                            }
-                        }
 
+                        if real_split {
+                            let jump = Self::emit_jump_forward(&branch2);
+                            branch1.push(jump);
+                            let split_code = Self::emit_split_code(branch1, branch2);
+                            group_instrs.extend(split_code);
+                        } else {
+                            group_instrs.extend(branch1);
+                        }
                         // 插入分组结束的指令
                         let num = self.current_group_num()?;
-                        self.instrs.push(Inst::GroupEnd(num));
-
+                        group_instrs.push(Inst::GroupEnd(num));
                         break;
                     }
-                    Some(_) => self.parse_term()?,
+                    Some(_) => {
+                        let res = self.parse_term()?;
+                        if real_split {
+                            branch2.extend(res);
+                        } else {
+                            branch1.extend(res);
+                        }
+                    }
                 }
             }
+
+            group_instrs
         } else {
             // parse like: 'a*','a+' or 'a?'
-            let atom = self.parse_atom()?;
-            match self.chars.peek() {
-                Some('*') => {
-                    self.chars.next();
-                    self.generate_zero_or_more_code(atom)?;
-                }
-                Some('+') => {
-                    self.chars.next();
-                    self.generate_one_or_more_code(atom)?;
-                }
-                Some('?') => {
-                    self.chars.next();
-                    self.generate_zero_or_one_code(atom)?;
-                }
-                Some('{') => todo!(),
-                Some(_) | None => self.instrs.extend(atom.into_iter()),
-            }
-        }
+            self.parse_atom()?
+        };
 
-        Ok(())
+        let block = match self.chars.peek() {
+            Some('*') => {
+                self.chars.next();
+                Self::emit_zero_or_more_code(block)
+            }
+            Some('+') => {
+                self.chars.next();
+                Self::emit_one_or_more_code(block)
+            }
+            Some('?') => {
+                self.chars.next();
+                Self::emit_zero_or_one_code(block)
+            }
+            Some('{') => todo!(),
+            Some(_) | None => block,
+        };
+
+        Ok(block)
     }
 
     fn parse_atom(&mut self) -> Result<Vec<Inst>, ParseError> {
@@ -231,9 +244,9 @@ impl<'p> Parser<'p> {
                     }
                 }
             }
-            Some('^') => self.instrs.push(Inst::Start),
+            Some('^') => atom_instrs.push(Inst::Start),
             Some('$') => {
-                self.instrs.push(Inst::End);
+                atom_instrs.push(Inst::End);
                 if self.chars.peek().is_some() {
                     return Err(ParseError::MisplacedAnchor);
                 }
@@ -251,43 +264,66 @@ impl<'p> Parser<'p> {
     fn pc(&self) -> usize {
         self.instrs.len()
     }
-    fn generate_zero_or_more_code(&mut self, atom: Vec<Inst>) -> Result<(), ParseError> {
-        let start = self.pc();
-        let split_code = Inst::Split(start + 1, 0);
-        self.instrs.push(split_code);
-        self.patch_list.push(start);
-        self.instrs.extend(atom.into_iter());
-        let jump_code = Inst::Jump(start);
-        self.instrs.push(jump_code);
-        let pc_to_target = self.pc();
-        if let Some(patch) = self.patch_list.pop() {
-            if let Some(Inst::Split(_, target)) = self.instrs.get_mut(patch) {
-                *target = pc_to_target;
-            }
-        }
 
-        Ok(())
+    fn calc_jump_offset<T>(base_pc: T, target_pc: T) -> isize
+    where
+        T: Add<Output = T> + Sub<Output = T> + Into<isize>,
+    {
+        let base: isize = base_pc.into();
+        let target: isize = target_pc.into();
+        target - (base)
     }
 
-    fn generate_one_or_more_code(&mut self, atom: Vec<Inst>) -> Result<(), ParseError> {
-        self.instrs.extend(atom.clone().into_iter());
-        self.generate_zero_or_more_code(atom)?;
-        Ok(())
+    fn emit_jump_forward(insts: &Vec<Inst>) -> Inst {
+        let target = insts.len() + 1;
+        let base = 0;
+        let offset = Self::calc_jump_offset(base as isize, target as isize);
+        Inst::Jump(offset)
     }
 
-    fn generate_zero_or_one_code(&mut self, atom: Vec<Inst>) -> Result<(), ParseError> {
-        let start = self.pc();
-        let split_code = Inst::Split(start + 1, 0);
-        self.instrs.push(split_code);
-        self.patch_list.push(start);
-        self.instrs.extend(atom.into_iter());
-        let pc_to_target = self.pc();
-        if let Some(index) = self.patch_list.pop() {
-            if let Some(Inst::Split(_, target)) = self.instrs.get_mut(index) {
-                *target = pc_to_target;
-            }
-        }
-        Ok(())
+    fn emit_jump_backward(insts: &Vec<Inst>) -> Inst {
+        let target = -1;
+        let base = insts.len();
+        let offset = Self::calc_jump_offset(base as isize, target as isize);
+        Inst::Jump(offset)
+    }
+
+    fn emit_split_code(branch1: Vec<Inst>, branch2: Vec<Inst>) -> Vec<Inst> {
+        let split_index = 0;
+        let branch1_len = branch1.len();
+        let branch2_index = split_index + branch1_len + 1;
+
+        let split_code = Inst::Split(
+            1,
+            Self::calc_jump_offset(split_index as isize, branch2_index as isize),
+        );
+
+        let mut target_instrs: Vec<Inst> = Vec::new();
+        target_instrs.push(split_code);
+        target_instrs.extend(branch1.into_iter());
+        target_instrs.extend(branch2.into_iter());
+
+        target_instrs
+    }
+
+    fn emit_zero_or_more_code(block: Vec<Inst>) -> Vec<Inst> {
+        let mut branch1 = block;
+        let branch2 = vec![];
+        branch1.push(Self::emit_jump_backward(&branch1));
+        Self::emit_split_code(branch1, branch2)
+    }
+
+    fn emit_one_or_more_code(block: Vec<Inst>) -> Vec<Inst> {
+        let mut res = vec![];
+        res.extend_from_slice(&block);
+        res.extend(Self::emit_zero_or_more_code(block));
+        res
+    }
+
+    fn emit_zero_or_one_code(block: Vec<Inst>) -> Vec<Inst> {
+        let branch1 = block;
+        let branch2 = vec![];
+        Self::emit_split_code(branch1, branch2)
     }
 
     fn translate_range(start: char, end: char) -> impl IntoIterator<Item = char> {

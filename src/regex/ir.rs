@@ -7,8 +7,8 @@ pub enum Inst {
     Start,
     End,
     Match,
-    Jump(usize),
-    Split(usize, usize),
+    Jump(isize),
+    Split(isize, isize),
     CharClass { negated: bool, chars: HashSet<char> },
     Digit,
     MetaChar, // \w : alpha digit '_'
