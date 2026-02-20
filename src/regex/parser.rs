@@ -4,6 +4,7 @@ use std::{
     iter::Peekable,
     ops::{Add, Sub},
     str::Chars,
+    usize,
 };
 
 use thiserror::{self, Error};
@@ -153,7 +154,8 @@ impl<'p> Parser<'p> {
                 self.chars.next();
 
                 let mut digit_buffer = vec![];
-                let mut digit = 1;
+                let mut min = 1;
+                let mut max = 1;
                 loop {
                     match self.chars.peek() {
                         Some(d @ '0'..='9') => {
@@ -163,12 +165,36 @@ impl<'p> Parser<'p> {
                         Some('}') => {
                             self.chars.next();
                             let digit_text: String = digit_buffer.iter().collect();
-                            digit = digit_text.parse::<usize>().map_err(|err| {
-                                ParseError::InvalidQuantifier(format!(
-                                    "解析数字失败 '{}': {}",
-                                    digit_text, err
-                                ))
-                            })?;
+                            let mut digits: Vec<&str> = digit_text.split(",").collect();
+                            if let Some(d1) = digits.pop() {
+                                min = d1.parse::<usize>().map_err(|err| {
+                                    ParseError::InvalidQuantifier(format!(
+                                        "解析数字失败 '{}': {}",
+                                        d1, err
+                                    ))
+                                })?;
+                            } else {
+                                return Err(ParseError::InvalidQuantifier(format!(
+                                    "非法的量词格式"
+                                )));
+                            }
+
+                            match digits.pop() {
+                                None => max = min,
+                                Some(d2) => {
+                                    if d2.is_empty() {
+                                        max = usize::MAX;
+                                    } else {
+                                        max = d2.parse::<usize>().map_err(|err| {
+                                            ParseError::InvalidQuantifier(format!(
+                                                "解析数字失败 '{}': {}",
+                                                d2, err
+                                            ))
+                                        })?;
+                                    }
+                                }
+                            }
+
                             break;
                         }
                         Some(_) | None => {
@@ -178,9 +204,25 @@ impl<'p> Parser<'p> {
                 }
 
                 let mut repeat_block = vec![];
-                for _i in 1..=digit {
+
+                if min > max {
+                    return Err(ParseError::InvalidQuantifier(format!("解析量词失败")));
+                }
+
+                for _ in 1..=min {
                     repeat_block.extend_from_slice(&block);
                 }
+                if max == usize::MAX {
+                    // >= min
+                    repeat_block.extend(Self::emit_zero_or_more_code(block))
+                } else if max != min {
+                    // repeat min - max times
+                    let at_most_once = Self::emit_zero_or_one_code(block);
+                    for _ in 1..=max {
+                        repeat_block.extend_from_slice(&at_most_once);
+                    }
+                }
+
                 repeat_block
             }
             Some(_) | None => block,
@@ -373,5 +415,15 @@ mod tests {
         eprintln!("{aa} --> {zz}");
         let v: Vec<char> = (a..=z).into_iter().collect();
         eprintln!("{:?}", v);
+    }
+
+    #[test]
+    fn test_split() {
+        let text = "2,";
+        let res: Vec<&str> = text.split(",").collect();
+        eprintln!("{:?}", res);
+        let text = "2";
+        let res: Vec<&str> = text.split(",").collect();
+        eprintln!("{:?}", res);
     }
 }
